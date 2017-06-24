@@ -62,7 +62,10 @@
 	 * Mouse Cursor Component for A-Frame.
 	 */
 	AFRAME.registerComponent('mouse-cursor', {
-		schema: {},
+		schema: {
+			objects: { type: 'string', default: '*' },
+			recursive: { default: false }
+		},
 
 		/**
 	  * Called once when component is attached. Generally for initial setup.
@@ -78,6 +81,7 @@
 			this._intersectedEl = null;
 			this._attachEventListeners();
 			this._canvasSize = false;
+			this.objects = [];
 			/* bind functions */
 			this.__getCanvasPos = this._getCanvasPos.bind(this);
 			this.__getCanvasPos = this._getCanvasPos.bind(this);
@@ -89,6 +93,7 @@
 			this.__onRelease = this._onRelease.bind(this);
 			this.__onTouchMove = this._onTouchMove.bind(this);
 			this.__onComponentChanged = this._onComponentChanged.bind(this);
+			this.__refreshObjects = this._refreshObjects.bind(this);
 		},
 
 
@@ -97,7 +102,9 @@
 	  * Generally modifies the entity based on the data.
 	  * @protected
 	  */
-		update: function update(oldData) {},
+		update: function update(oldData) {
+			this._refreshObjects();
+		},
 
 
 		/**
@@ -156,30 +163,35 @@
 			}
 
 			window.addEventListener('resize', this.__getCanvasPos);
-			document.addEventListener('scroll', this.__getCanvasPos
+			document.addEventListener('scroll', this.__getCanvasPos);
 			/* update _canvas in case scene is embedded */
-			);this._getCanvasPos
+			this._getCanvasPos();
 
 			/* scene */
-			();sceneEl.addEventListener('enter-vr', this.__onEnterVR);
-			sceneEl.addEventListener('exit-vr', this.__onExitVR
+			sceneEl.addEventListener('enter-vr', this.__onEnterVR);
+			sceneEl.addEventListener('exit-vr', this.__onExitVR);
 
 			/* Mouse events */
-			);canvas.addEventListener('mousedown', this.__onDown);
+			canvas.addEventListener('mousedown', this.__onDown);
 			canvas.addEventListener('mousemove', this.__onMouseMove);
 			canvas.addEventListener('mouseup', this.__onRelease);
-			canvas.addEventListener('mouseout', this.__onRelease
+			canvas.addEventListener('mouseout', this.__onRelease);
 
 			/* Touch events */
-			);canvas.addEventListener('touchstart', this.__onDown);
+			canvas.addEventListener('touchstart', this.__onDown);
 			canvas.addEventListener('touchmove', this.__onTouchMove);
-			canvas.addEventListener('touchend', this.__onRelease
+			canvas.addEventListener('touchend', this.__onRelease);
 
 			/* Click event */
-			);canvas.addEventListener('click', this.__onClick
+			canvas.addEventListener('click', this.__onClick);
 
 			/* Element component change */
-			);el.addEventListener('componentchanged', this.__onComponentChanged);
+			el.addEventListener('componentchanged', this.__onComponentChanged);
+
+			/* Object filtering */
+			sceneEl.addEventListener('loaded', this.__refreshObjects);
+			sceneEl.addEventListener('child-detached', this.__refreshObjects);
+			sceneEl.addEventListener('child-attached', this.__refreshObjects);
 		},
 
 
@@ -196,28 +208,33 @@
 			}
 
 			window.removeEventListener('resize', this.__getCanvasPos);
-			document.removeEventListener('scroll', this.__getCanvasPos
+			document.removeEventListener('scroll', this.__getCanvasPos);
 
 			/* scene */
-			);sceneEl.removeEventListener('enter-vr', this.__onEnterVR);
-			sceneEl.removeEventListener('exit-vr', this.__onExitVR
+			sceneEl.removeEventListener('enter-vr', this.__onEnterVR);
+			sceneEl.removeEventListener('exit-vr', this.__onExitVR);
 
 			/* Mouse events */
-			);canvas.removeEventListener('mousedown', this.__onDown);
+			canvas.removeEventListener('mousedown', this.__onDown);
 			canvas.removeEventListener('mousemove', this.__onMouseMove);
 			canvas.removeEventListener('mouseup', this.__onRelease);
-			canvas.removeEventListener('mouseout', this.__onRelease
+			canvas.removeEventListener('mouseout', this.__onRelease);
 
 			/* Touch events */
-			);canvas.removeEventListener('touchstart', this.__onDown);
+			canvas.removeEventListener('touchstart', this.__onDown);
 			canvas.removeEventListener('touchmove', this.__onTouchMove);
-			canvas.removeEventListener('touchend', this.__onRelease
+			canvas.removeEventListener('touchend', this.__onRelease);
 
 			/* Click event */
-			);canvas.removeEventListener('click', this.__onClick
+			canvas.removeEventListener('click', this.__onClick);
 
 			/* Element component change */
-			);el.removeEventListener('componentchanged', this.__onComponentChanged);
+			el.removeEventListener('componentchanged', this.__onComponentChanged);
+
+			/* Object filtering */
+			sceneEl.removeEventListener('child-attached', this.__refreshObjects);
+			sceneEl.removeEventListener('child-detached', this.__refreshObjects);
+			sceneEl.removeEventListener('loaded', this.__refreshObjects);
 		},
 
 
@@ -446,8 +463,7 @@
 	  * @private
 	  */
 		_getCanvasPos: function _getCanvasPos() {
-			this._canvasSize = this.el.sceneEl.canvas.getBoundingClientRect // update _canvas in case scene is embedded
-			();
+			this._canvasSize = this.el.sceneEl.canvas.getBoundingClientRect(); // update _canvas in case scene is embedded
 		},
 
 
@@ -483,27 +499,29 @@
 	  * @private
 	  */
 		_updateIntersectObject: function _updateIntersectObject() {
+			var _this2 = this;
+
 			var _raycaster = this._raycaster,
 			    el = this.el,
 			    _mouse = this._mouse;
 			var scene = el.sceneEl.object3D;
 
 			var camera = this.el.getObject3D('camera');
-			this._getAllChildren
+			this._getAllChildren();
 			/* find intersections */
 			// _raycaster.setFromCamera(_mouse, camera) /* this somehow gets error so did the below */
-			();_raycaster.ray.origin.setFromMatrixPosition(camera.matrixWorld);
-			_raycaster.ray.direction.set(_mouse.x, _mouse.y, 0.5).unproject(camera).sub(_raycaster.ray.origin).normalize
+			_raycaster.ray.origin.setFromMatrixPosition(camera.matrixWorld);
+			_raycaster.ray.direction.set(_mouse.x, _mouse.y, 0.5).unproject(camera).sub(_raycaster.ray.origin).normalize();
 
 			/* get objects intersected between mouse and camera */
-			();var children = this._getAllChildren();
+			var children = this._getAllChildren();
 			var intersects = _raycaster.intersectObjects(children);
 
 			if (intersects.length > 0) {
 				/* get the closest three obj */
 				var obj = void 0;
 				intersects.every(function (item) {
-					if (item.object.parent.visible === true) {
+					if (item.object.parent.visible === true && _this2._isElementInObjects(item.object.parent.el)) {
 						obj = item.object;
 						return false;
 					} else {
@@ -521,9 +539,9 @@
 				if (this._intersectedEl === _el) {
 					return;
 				}
-				this._clearIntersectObject
+				this._clearIntersectObject();
 				/* apply new object as intersected */
-				();this._setIntersectObject(_el);
+				this._setIntersectObject(_el);
 			} else {
 				this._clearIntersectObject();
 			}
@@ -577,6 +595,71 @@
 			if (_intersectedEl) {
 				_intersectedEl.emit(evt);
 			}
+		},
+
+
+		/*===============================
+	 =       objects selection       =
+	 ===============================*/
+
+		/**
+	  * @private
+	  */
+		_refreshObjects: function _refreshObjects(e) {
+			var self = this;
+			this.objects = [];
+			var selectedObjects = this.el.sceneEl.querySelectorAll(this.data.objects);
+			selectedObjects.forEach(function (obj) {
+				/* adding selected object to object list */
+				self._addElement(obj, self.data.recursive);
+			});
+		},
+
+
+		/**
+	  * @private
+	  */
+		_addElement: function _addElement(el, recursive) {
+			this.objects.push(el);
+			if (recursive) {
+				var _iteratorNormalCompletion = true;
+				var _didIteratorError = false;
+				var _iteratorError = undefined;
+
+				try {
+					for (var _iterator = el.children[Symbol.iterator](), _step; !(_iteratorNormalCompletion = (_step = _iterator.next()).done); _iteratorNormalCompletion = true) {
+						var obj = _step.value;
+
+						this._addElement(obj, recursive);
+					}
+				} catch (err) {
+					_didIteratorError = true;
+					_iteratorError = err;
+				} finally {
+					try {
+						if (!_iteratorNormalCompletion && _iterator.return) {
+							_iterator.return();
+						}
+					} finally {
+						if (_didIteratorError) {
+							throw _iteratorError;
+						}
+					}
+				}
+
+				;
+			}
+		},
+
+
+		/**
+	  * @private
+	  */
+		_isElementInObjects: function _isElementInObjects(el) {
+			for (var i = 0; i < this.objects.length; i++) {
+				if (this.objects[i] === el) return true;
+			}
+			return false;
 		}
 	});
 

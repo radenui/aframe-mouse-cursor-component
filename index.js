@@ -10,7 +10,10 @@ const IS_VR_AVAILABLE = AFRAME.utils.device.isMobile() || window.hasNonPolyfillW
  * Mouse Cursor Component for A-Frame.
  */
 AFRAME.registerComponent('mouse-cursor', {
-	schema: { },
+  schema: {
+    objects: { type: 'string', default: '*' },
+    recursive: { default: false }
+  },
 
 	/**
 	 * Called once when component is attached. Generally for initial setup.
@@ -26,6 +29,7 @@ AFRAME.registerComponent('mouse-cursor', {
 		this._intersectedEl = null
 		this._attachEventListeners()
 		this._canvasSize = false
+    this.objects = []
 		/* bind functions */
 		this.__getCanvasPos = this._getCanvasPos.bind(this)
 		this.__getCanvasPos = this._getCanvasPos.bind(this)
@@ -37,6 +41,7 @@ AFRAME.registerComponent('mouse-cursor', {
 		this.__onRelease = this._onRelease.bind(this)
 		this.__onTouchMove = this._onTouchMove.bind(this)
 		this.__onComponentChanged = this._onComponentChanged.bind(this)
+    this.__refreshObjects = this._refreshObjects.bind(this)
 	},
 
 	/**
@@ -45,6 +50,7 @@ AFRAME.registerComponent('mouse-cursor', {
 	 * @protected
 	 */
 	update (oldData) {
+    this._refreshObjects()
 	},
 
 	/**
@@ -124,6 +130,10 @@ AFRAME.registerComponent('mouse-cursor', {
 		/* Element component change */
 		el.addEventListener('componentchanged', this.__onComponentChanged)
 
+    /* Object filtering */
+    sceneEl.addEventListener('loaded', this.__refreshObjects)
+    sceneEl.addEventListener('child-detached', this.__refreshObjects)
+    sceneEl.addEventListener('child-attached', this.__refreshObjects)
 	},
 
 	/**
@@ -160,6 +170,10 @@ AFRAME.registerComponent('mouse-cursor', {
 		/* Element component change */
 		el.removeEventListener('componentchanged', this.__onComponentChanged)
 
+    /* Object filtering */
+    sceneEl.removeEventListener('child-attached', this.__refreshObjects)
+    sceneEl.removeEventListener('child-detached', this.__refreshObjects)
+    sceneEl.removeEventListener('loaded', this.__refreshObjects)
 	},
 
 	/**
@@ -392,7 +406,6 @@ AFRAME.registerComponent('mouse-cursor', {
 	 */
 	_updateIntersectObject () {
 		const { _raycaster, el, _mouse } = this
-		const { object3D: scene } = el.sceneEl
 		const camera = this.el.getObject3D('camera')
 		this._getAllChildren()
 		/* find intersections */
@@ -408,7 +421,8 @@ AFRAME.registerComponent('mouse-cursor', {
 			/* get the closest three obj */
 			let obj
 			intersects.every(item => {
-				if (item.object.parent.visible === true) {
+				if (item.object.parent.visible === true &&
+            this._isElementInObjects(item.object.parent.el)) {
 					obj = item.object
 					return false
 				}
@@ -477,4 +491,43 @@ AFRAME.registerComponent('mouse-cursor', {
 		if (_intersectedEl) { _intersectedEl.emit(evt) }
 	},
 
+  /*===============================
+  =       objects selection       =
+  ===============================*/
+
+  /**
+   * @private
+   */
+  _refreshObjects(e) {
+    var self = this;
+    this.objects = [];
+    var selectedObjects = this.el.sceneEl.querySelectorAll(this.data.objects);
+    selectedObjects.forEach(function(obj){
+      /* adding selected object to object list */
+      self._addElement(obj, self.data.recursive);
+    });
+  },
+
+  /**
+   * @private
+   */
+  _addElement(el, recursive) {
+    this.objects.push(el);
+    if(recursive){
+      for (var obj of el.children){
+        this._addElement(obj, recursive);
+      };
+    }
+  },
+
+  /**
+   * @private
+   */
+  _isElementInObjects(el) {
+    for (var i = 0; i < this.objects.length; i++) {
+      if (this.objects[i] === el)
+        return true;
+    }
+    return false;
+  }
 })
